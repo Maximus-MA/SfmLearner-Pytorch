@@ -113,7 +113,7 @@ def generate_depth_map(velo_path, P_rect, velo2cam, width, height, resize):
 
     # project to image
     depth = np.zeros((height // resize, width // resize)).astype(np.float32)
-    depth[velo_pts_im[:, 1].astype(np.int), velo_pts_im[:, 0].astype(np.int)] = velo_pts_im[:, 2]
+    depth[velo_pts_im[:, 1].astype(np.int32), velo_pts_im[:, 0].astype(np.int32)] = velo_pts_im[:, 2]
 
     # find the duplicate points and choose the closest depth
     inds = sub2ind(depth.shape, velo_pts_im[:, 1], velo_pts_im[:, 0])

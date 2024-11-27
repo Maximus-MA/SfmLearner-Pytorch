@@ -31,7 +31,8 @@ class KittiRawLoader(object):
         self.img_height = img_height
         self.img_width = img_width
         self.cam_ids = ['02', '03']
-        self.date_list = ['2011_09_26', '2011_09_28', '2011_09_29', '2011_09_30', '2011_10_03']
+        # self.date_list = ['2011_09_26', '2011_09_28', '2011_09_29', '2011_09_30', '2011_10_03']
+        self.date_list = ['2011_09_26']
         self.min_disp = min_disp
         self.get_depth = get_depth
         self.get_pose = get_pose
@@ -150,7 +151,7 @@ class KittiRawLoader(object):
 
     def load_image(self, scene_data, tgt_idx):
         img_file = scene_data['dir']/'image_{}'.format(scene_data['cid'])/'data'/scene_data['frame_id'][tgt_idx]+'.png'
-        if not img_file.isfile():
+        if not img_file.is_file():
             return None
         img = imread(img_file)
         zoom_y = self.img_height/img.shape[0]

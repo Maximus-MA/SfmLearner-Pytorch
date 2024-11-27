@@ -13,7 +13,7 @@ def crawl_folders(folders_list):
             current_depth = []
             for img in current_imgs:
                 d = img.dirname()/(img.name[:-4] + '.npy')
-                assert(d.isfile()), "depth file {} not found".format(str(d))
+                assert(d.is_file()), "depth file {} not found".format(str(d))
                 depth.append(d)
             imgs.extend(current_imgs)
             depth.extend(current_depth)
