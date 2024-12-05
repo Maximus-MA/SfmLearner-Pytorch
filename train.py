@@ -155,6 +155,7 @@ def main():
     print("=> creating model")
 
     disp_net = models.DispNetS_v2().to(device)
+    print("using device {}".format(device))
     output_exp = args.mask_loss_weight > 0
     if not output_exp:
         print("=> no mask loss, PoseExpnet will only output pose")
@@ -171,8 +172,8 @@ def main():
         print("=> using pre-trained weights for Dispnet")
         weights = torch.load(args.pretrained_disp)
         disp_net.load_state_dict(weights['state_dict'])
-    # else:
-    #     disp_net.init_weights()
+    else:
+        disp_net.init_weights()
 
     cudnn.benchmark = True
     disp_net = torch.nn.DataParallel(disp_net)
