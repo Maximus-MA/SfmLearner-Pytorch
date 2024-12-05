@@ -3,3 +3,4 @@ __pycache__/
 checkpoints/
 formatted_data/
 kitti/
+output/
