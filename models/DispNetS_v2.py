@@ -33,7 +33,7 @@ class DispNetS_v2(nn.Module):
         self.encoder2 = nn.Sequential(resnet.maxpool, resnet.layer1)
         self.encoder3 = resnet.layer2
         self.encoder4 = resnet.layer3
-        self.encoder5 = resnet.layer4
+        self.encoder5 = resnet.layer4  # W/16, H/16
 
         decoder_channels = [256, 128, 64, 32, 16]
         self.decoder5 = ModuleList([

@@ -159,7 +159,7 @@ def main():
     output_exp = args.mask_loss_weight > 0
     if not output_exp:
         print("=> no mask loss, PoseExpnet will only output pose")
-    pose_exp_net = models.PoseExpNet(nb_ref_imgs=args.sequence_length - 1, output_exp=args.mask_loss_weight > 0).to(device)
+    pose_exp_net = models.PoseExpNet_v2(nb_ref_imgs=args.sequence_length - 1, output_exp=args.mask_loss_weight > 0).to(device)
 
     if args.pretrained_exp_pose:
         print("=> using pre-trained weights for explainabilty and pose net")
