@@ -320,7 +320,7 @@ def train(args, train_loader, disp_net, pose_exp_net, optimizer, epoch_size, log
         loss = w1*loss_1 + w2*loss_2 + w3*loss_3
 
         if log_losses:
-            tb_writer.add_scalar('photometric_error', loss_1.item(), n_iter)
+            tb_writer.add_scalar('reconstruction_error', loss_1.item(), n_iter)
             if w2 > 0:
                 tb_writer.add_scalar('explanability_loss', loss_2.item(), n_iter)
             tb_writer.add_scalar('disparity_smoothness_loss', loss_3.item(), n_iter)
@@ -386,7 +386,7 @@ def validate_without_gt(args, val_loader, disp_net, pose_exp_net, epoch, logger,
         depth = 1/disp
         explainability_mask, pose = pose_exp_net(tgt_img, ref_imgs)
 
-        loss_1, warped, diff = photometric_reconstruction_loss(tgt_img, ref_imgs,
+        loss_1, warped, diff = reconstruction_loss_with_ssim(tgt_img, ref_imgs,
                                                                intrinsics, depth,
                                                                explainability_mask, pose,
                                                                args.rotation_mode, args.padding_mode)
