@@ -4,14 +4,13 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from inverse_warp import inverse_warp
+from pytorch_msssim import ssim
 
 
 def photometric_reconstruction_loss(tgt_img, ref_imgs, intrinsics,
                                     depth, explainability_mask, pose,
                                     rotation_mode='euler', padding_mode='zeros'):
     def one_scale(depth, explainability_mask):
-    #     print('depth size', depth.size())
-    #     print('explainability_mask size', explainability_mask.size())
         assert(explainability_mask is None or depth.size()[2:] == explainability_mask.size()[2:])
         assert(pose.size(1) == len(ref_imgs))
 
@@ -42,6 +41,86 @@ def photometric_reconstruction_loss(tgt_img, ref_imgs, intrinsics,
 
             warped_imgs.append(ref_img_warped[0])
             diff_maps.append(diff[0])
+
+        return reconstruction_loss, warped_imgs, diff_maps
+
+    warped_results, diff_results = [], []
+    if type(explainability_mask) not in [tuple, list]:
+        explainability_mask = [explainability_mask]
+    if type(depth) not in [list, tuple]:
+        depth = [depth]
+
+    total_loss = 0
+    for d, mask in zip(depth, explainability_mask):
+        loss, warped, diff = one_scale(d, mask)
+        total_loss += loss
+        warped_results.append(warped)
+        diff_results.append(diff)
+    return total_loss, warped_results, diff_results
+
+
+def ssim_map(x, y, window_size=3, C1=0.01**2, C2=0.03**2):
+    padding = window_size // 2
+    x = F.pad(x, [padding, padding, padding, padding], mode='reflect')
+    y = F.pad(y, [padding, padding, padding, padding], mode='reflect')
+
+    mu_x = F.avg_pool2d(x, window_size, stride=1)
+    mu_y = F.avg_pool2d(y, window_size, stride=1)
+    sigma_x = F.avg_pool2d(x ** 2, window_size, stride=1) - mu_x ** 2
+    sigma_y = F.avg_pool2d(y ** 2, window_size, stride=1) - mu_y ** 2
+    sigma_xy = F.avg_pool2d(x * y, window_size, stride=1) - mu_x * mu_y
+
+    numerator = (2 * mu_x * mu_y + C1) * (2 * sigma_xy + C2)
+    denominator = (mu_x ** 2 + mu_y ** 2 + C1) * (sigma_x + sigma_y + C2)
+    ssim_map = numerator / (denominator + 1e-7)  # Avoid division by zero
+    return ssim_map
+
+
+def reconstruction_loss_with_ssim(tgt_img, ref_imgs, intrinsics,
+                                    depth, explainability_mask, pose,
+                                    rotation_mode='euler', padding_mode='zeros',
+                                    ssim_weight=0.8):
+    def one_scale(depth, explainability_mask):
+        # assert(explainability_mask is None or depth.size()[2:] == explainability_mask.size()[2:])
+        # assert(pose.size(1) == len(ref_imgs))
+
+        reconstruction_loss = 0
+        b, _, h, w = depth.size()
+        downscale = tgt_img.size(2)/h
+
+        tgt_img_scaled = F.interpolate(tgt_img, (h, w), mode='area')
+        ref_imgs_scaled = [F.interpolate(ref_img, (h, w), mode='area') for ref_img in ref_imgs]
+        intrinsics_scaled = torch.cat((intrinsics[:, 0:2]/downscale, intrinsics[:, 2:]), dim=1)
+
+        warped_imgs = []
+        diff_maps = []
+
+        for i, ref_img in enumerate(ref_imgs_scaled):
+            current_pose = pose[:, i]
+
+            ref_img_warped, valid_points = inverse_warp(ref_img, depth[:,0], current_pose,
+                                                        intrinsics_scaled,
+                                                        rotation_mode, padding_mode)
+            valid_points = valid_points.unsqueeze(1).float()
+            diff = (tgt_img_scaled - ref_img_warped) * valid_points
+            valid_warped = ref_img_warped * valid_points
+            valid_tgt = tgt_img_scaled * valid_points
+
+            ssim_res = 1 - ssim_map(valid_tgt, valid_warped)
+
+            if explainability_mask is not None:
+                explainability_mask_i = explainability_mask[:, i:i+1]
+                # print(diff.shape, explainability_mask_i.shape)
+                diff = diff * explainability_mask_i
+                # print(ssim_res.shape, explainability_mask_i.shape)
+                ssim_res = ssim_res * explainability_mask_i
+
+            reconstruction_loss += ssim_weight * diff.abs().mean()
+            reconstruction_loss += (1 - ssim_weight) * ssim_res.mean()
+            # assert((reconstruction_loss == reconstruction_loss).item() == 1)
+
+            warped_imgs.append(ref_img_warped[0])
+            diff_maps.append((tgt_img_scaled - ref_img_warped)[0])
 
         return reconstruction_loss, warped_imgs, diff_maps
 

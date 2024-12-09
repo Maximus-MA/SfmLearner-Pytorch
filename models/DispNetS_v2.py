@@ -28,7 +28,7 @@ class DispNetS_v2(nn.Module):
         self.beta = beta
 
         encoder_channels = [64, 64, 128, 256, 512]
-        resnet = models.resnet18(pretrained=True)
+        resnet = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
         self.encoder1 = nn.Sequential(resnet.conv1, resnet.bn1, resnet.relu)
         self.encoder2 = nn.Sequential(resnet.maxpool, resnet.layer1)
         self.encoder3 = resnet.layer2
@@ -57,20 +57,17 @@ class DispNetS_v2(nn.Module):
             conv(decoder_channels[4], decoder_channels[4])
         ])
 
-        self.upsample = lambda x: F.interpolate(x, scale_factor=2, mode="nearest")
+        self.upsample = lambda x: F.interpolate(x, scale_factor=2, mode="bilinear")
 
         self.predict_disp4 = predict_disp(decoder_channels[-4])
         self.predict_disp3 = predict_disp(decoder_channels[-3])
         self.predict_disp2 = predict_disp(decoder_channels[-2])
         self.predict_disp1 = predict_disp(decoder_channels[-1])
 
+        # self.pretrained_modules = nn.ModuleList([self.encoder1, self.encoder2, self.encoder3, self.encoder4, self.encoder5])
+
         
     def init_weights(self):
-        # for m in self.modules():
-        #     if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
-        #         xavier_uniform_(m.weight)
-        #         if m.bias is not None:
-        #             zeros_(m.bias)
         pass
 
     def forward(self, x):

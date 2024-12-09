@@ -20,20 +20,29 @@ class PoseExpNet_v2(nn.Module):
         self.nb_ref_imgs = nb_ref_imgs
         self.output_exp = output_exp
 
-        self.encoder0 = nn.Sequential(
-            nn.Conv2d(3*(1+self.nb_ref_imgs), 3, kernel_size=1),
-            nn.ReLU(inplace=True)
-        )
+        # self.encoder0 = nn.Sequential(
+        #     nn.Conv2d(3*(1+self.nb_ref_imgs), 3, kernel_size=1),
+        #     nn.ReLU(inplace=True)
+        # )
 
         encoder_channels = [64, 64, 128, 256, 512]
-        resnet = models.resnet18(pretrained=True)
-        self.encoder1 = nn.Sequential(resnet.conv1, resnet.bn1, resnet.relu)
+        resnet = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
+        old_conv1 = resnet.conv1
+        new_conv1 = nn.Conv2d(3*(1+self.nb_ref_imgs), 64, kernel_size=7, stride=2, padding=3, bias=False)
+        new_conv1.weight.data[:, :3] = old_conv1.weight.data
+        self.encoder1 = nn.Sequential(
+            new_conv1,
+            resnet.bn1, 
+            resnet.relu
+        )
         self.encoder2 = nn.Sequential(resnet.maxpool, resnet.layer1)
         self.encoder3 = resnet.layer2
         self.encoder4 = resnet.layer3
         self.encoder5 = resnet.layer4
 
         self.pose_pred = nn.Conv2d(encoder_channels[-1], 6*self.nb_ref_imgs, kernel_size=1, padding=0)
+
+        # self.pretrained_modules = ModuleList([self.encoder2, self.encoder3, self.encoder4, self.encoder5])
 
         if self.output_exp:
             decoder_channels = [256, 128, 64, 32, 16]
@@ -58,7 +67,7 @@ class PoseExpNet_v2(nn.Module):
                 conv(decoder_channels[4], decoder_channels[4])
             ])
 
-            self.upsample = lambda x: F.interpolate(x, scale_factor=2, mode="nearest")
+            self.upsample = lambda x: F.interpolate(x, scale_factor=2, mode="bilinear")
 
             self.predict_mask4 = nn.Conv2d(decoder_channels[1], self.nb_ref_imgs, kernel_size=3, padding=1)
             self.predict_mask3 = nn.Conv2d(decoder_channels[2], self.nb_ref_imgs, kernel_size=3, padding=1)
@@ -75,7 +84,7 @@ class PoseExpNet_v2(nn.Module):
         input.extend(ref_imgs)
         input = torch.cat(input, 1)
 
-        input = self.encoder0(input)
+        # input = self.encoder0(input)
         out_encoder1 = self.encoder1(input)
         out_encoder2 = self.encoder2(out_encoder1)
         out_encoder3 = self.encoder3(out_encoder2)

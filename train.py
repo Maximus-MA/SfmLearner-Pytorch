@@ -11,7 +11,7 @@ import custom_transforms
 import models
 from utils import tensor2array, save_checkpoint, save_path_formatter, log_output_tensorboard
 
-from loss_functions import photometric_reconstruction_loss, explainability_loss, smooth_loss
+from loss_functions import reconstruction_loss_with_ssim, explainability_loss, smooth_loss
 from loss_functions import compute_depth_errors, compute_pose_errors
 from inverse_warp import pose_vec2mat
 from logger import TermLogger, AverageMeter
@@ -181,10 +181,29 @@ def main():
 
     print('=> setting adam solver')
 
+    disp_pretrained_params = []
+    disp_new_params = []
+    for name, param in disp_net.named_parameters():
+        if "encoder1" in name:
+            disp_pretrained_params.append(param)
+        else: 
+            disp_new_params.append(param)
+    
+    pose_pretrained_params = []
+    pose_new_params = []
+    for name, param in pose_exp_net.named_parameters():
+        if "encoder" in name and "encoder0" not in name:
+            pose_pretrained_params.append(param)
+        else:
+            pose_new_params.append(param)
+    
     optim_params = [
-        {'params': disp_net.parameters(), 'lr': args.lr},
-        {'params': pose_exp_net.parameters(), 'lr': args.lr}
+        {'params': disp_pretrained_params, 'lr': args.lr * 0.1},
+        {'params': disp_new_params, 'lr': args.lr},
+        {'params': pose_pretrained_params, 'lr': args.lr * 0.1},
+        {'params': pose_new_params, 'lr': args.lr}
     ]
+
     optimizer = torch.optim.Adam(optim_params,
                                  betas=(args.momentum, args.beta),
                                  weight_decay=args.weight_decay)
@@ -288,9 +307,10 @@ def train(args, train_loader, disp_net, pose_exp_net, optimizer, epoch_size, log
         depth = [1/disp for disp in disparities]
         explainability_mask, pose = pose_exp_net(tgt_img, ref_imgs)
 
-        loss_1, warped, diff = photometric_reconstruction_loss(tgt_img, ref_imgs, intrinsics,
+        loss_1, warped, diff = reconstruction_loss_with_ssim(tgt_img, ref_imgs, intrinsics,
                                                                depth, explainability_mask, pose,
-                                                               args.rotation_mode, args.padding_mode)
+                                                               args.rotation_mode, args.padding_mode,
+                                                               ssim_weight=0.8)
         if w2 > 0:
             loss_2 = explainability_loss(explainability_mask)
         else:
